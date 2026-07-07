@@ -42,16 +42,13 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
 
     // CameraX Libraries
-    val cameraxVersion = "1.3.4" // Stabil sürüm
-    implementation("androidx.camera:camera-core:$cameraxVersion")
-    implementation("androidx.camera:camera-camera2:$cameraxVersion")
-    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
-    implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
-    // Google ML Kit Selfie Segmentation For Background Removal
-    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta4")
-
-    // Google ML Kit Face Detection and Face Mesh
-    implementation("com.google.mlkit:face-detection:16.1.7")
-    implementation("com.google.mlkit:face-mesh-detection:16.0.0-beta3")
+    // Google ML Kit
+    implementation(libs.mlkit.face.detection)
+    implementation(libs.mlkit.face.mesh.detection)
+    implementation(libs.mlkit.segmentation.selfie)
 }

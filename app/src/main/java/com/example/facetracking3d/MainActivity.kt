@@ -18,10 +18,56 @@ import androidx.camera.core.CameraSelector
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.segmentation.Segmentation
+import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
+
 class MainActivity : AppCompatActivity() {
 
     private val CAMERA_REQUEST_CODE = 1001
     private lateinit var cameraExecutor: ExecutorService
+
+    // Gerçek zamanlı (STREAM_MODE) çalışacak şekilde optimize ediyoruz
+    private val segmenter = Segmentation.getClient(
+        SelfieSegmenterOptions.Builder()
+            .setDetectorMode(SelfieSegmenterOptions.STREAM_MODE)
+            .enableRawSizeMask() // Performans için ham maske boyutunu kullan
+            .build()
+    )
+
+    @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
+    private fun processImageProxy(imageProxy: ImageProxy) {
+        val mediaImage = imageProxy.image
+        if (mediaImage != null) {
+            // CameraX ImageProxy'yi ML Kit'in anladığı InputImage formatına çeviriyoruz
+            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+
+            segmenter.process(image)
+                .addOnSuccessListener { segmentationMask ->
+                    // BAŞARILI: Yapay zeka arkaplanı ve insanı ayırdı!
+                    // segmentationMask nesnesinin içinde maske matrisi var.
+
+                    val maskBuffer = segmentationMask.buffer
+                    val maskWidth = segmentationMask.width
+                    val maskHeight = segmentationMask.height
+
+                    // TODO: Bu aşamada maskBuffer'ı kullanarak arkaplan piksellerini yeşile boyayacağız.
+                    // Log atarak çalıştığını test edelim:
+                    android.util.Log.d("Segmentation", "Maske üretildi: ${maskWidth}x${maskHeight}")
+                }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("Segmentation", "Model hatası: ", e)
+                }
+                .addOnCompleteListener {
+                    // Çok Kritik: İşlem bitince bu kareyi serbest bırakmalıyız ki sonraki kare gelebilsin
+                    imageProxy.close()
+                }
+        } else {
+            imageProxy.close()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,8 +119,20 @@ class MainActivity : AppCompatActivity() {
             val preview = Preview.Builder()
                 .build()
                 .also {
-                    // Eğer binding kullanıyorsan: binding.viewFinder.surfaceProvider
                     it.setSurfaceProvider(findViewById<androidx.camera.view.PreviewView>(R.id.viewFinder).surfaceProvider)
+                }
+
+            // 2. Machine Learning analysis layer
+            // Galaxy M23'ü yormamak için performans ayarı yapıyoruz
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST) // Kuyrukta frame biriktirme, hep en son kareyi al
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888) // Standart Android kamera formatı
+                .build()
+                .also { analyzer ->
+                    analyzer.setAnalyzer(cameraExecutor) { imageProxy ->
+                        // Her kamera karesi buraya düşecek!
+                        processImageProxy(imageProxy)
+                    }
                 }
 
             // We've chosen the front camera
@@ -85,12 +143,12 @@ class MainActivity : AppCompatActivity() {
 
                 // Bind the camera to the activity's lifecycle
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview
+                    this, cameraSelector, preview, imageAnalyzer
                 )
 
             } catch (exc: Exception) {
                 // If camera can't start log it
-                android.util.Log.e("FaceTracking", "Camera couldn't start", exc)
+                android.util.Log.e("FaceTracking", "Lifecycle failed", exc)
             }
 
         }, ContextCompat.getMainExecutor(this))
