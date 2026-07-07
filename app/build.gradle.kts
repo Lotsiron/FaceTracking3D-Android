@@ -5,15 +5,13 @@ plugins {
 android {
     namespace = "com.example.facetracking3d"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
         applicationId = "com.example.facetracking3d"
         minSdk = 30
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
@@ -42,4 +40,18 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+
+    // CameraX Libraries
+    val cameraxVersion = "1.3.4" // Stabil sürüm
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Google ML Kit Selfie Segmentation For Background Removal
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta4")
+
+    // Google ML Kit Face Detection and Face Mesh
+    implementation("com.google.mlkit:face-detection:16.1.7")
+    implementation("com.google.mlkit:face-mesh-detection:16.0.0-beta3")
 }
