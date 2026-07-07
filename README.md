@@ -1,0 +1,1 @@
+A mobile program for tracking a face on live video and attaching 3D models to the face such as hats and masks. That can also remove background and send the output live video over wireless
