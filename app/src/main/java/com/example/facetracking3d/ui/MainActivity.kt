@@ -17,8 +17,10 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.facetracking3d.vision.FrameAnalyzer
 import com.example.facetracking3d.R
+import com.example.facetracking3d.graphics.MaskRenderer
 import com.google.mlkit.vision.segmentation.Segmentation
 import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
 import java.util.concurrent.ExecutorService
@@ -28,14 +30,7 @@ class MainActivity : AppCompatActivity() {
 
     private val CAMERA_REQUEST_CODE = 1001
     private lateinit var cameraExecutor: ExecutorService
-
-    // Optimization for real time (STREAM_MODE)
-    private val segmenter = Segmentation.getClient(
-        SelfieSegmenterOptions.Builder()
-            .setDetectorMode(SelfieSegmenterOptions.STREAM_MODE)
-            .enableRawSizeMask() // Use raw mask size for performance
-            .build()
-    )
+    private lateinit var maskRenderer: MaskRenderer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +51,8 @@ class MainActivity : AppCompatActivity() {
                 this, arrayOf(Manifest.permission.CAMERA), CAMERA_REQUEST_CODE
             )
         }
+        val sceneView = findViewById<io.github.sceneview.SceneView>(R.id.sceneView)
+        maskRenderer = MaskRenderer(lifecycleScope, sceneView)
     }
 
     private fun allPermissionsGranted() = ContextCompat.checkSelfPermission(
@@ -87,7 +84,7 @@ class MainActivity : AppCompatActivity() {
             val preview = Preview.Builder()
                 .build()
                 .also {
-                    it.setSurfaceProvider(findViewById<PreviewView>(R.id.viewFinder).surfaceProvider)
+                    it.setSurfaceProvider(findViewById<PreviewView>(R.id.viewFinder)?.surfaceProvider)
                 }
 
             // 2. Machine Learning analysis layer
@@ -96,14 +93,26 @@ class MainActivity : AppCompatActivity() {
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                 .build()
                 .also { analyzer ->
-                    // Yeni katmanımızı çağırıyoruz ve biten resmi ImageView'a basıyoruz
-                    analyzer.setAnalyzer(cameraExecutor, FrameAnalyzer { finalBitmap ->
-                        runOnUiThread {
-                            val processedImageView =
-                                findViewById<ImageView>(R.id.processedImageView)
-                            processedImageView?.setImageBitmap(finalBitmap)
+                    // Ekranın fiziksel yönünü CameraX'e bildiriyoruz ki maske kaymasın
+                    val displayRotation = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        display?.rotation ?: android.view.Surface.ROTATION_0
+                    } else {
+                        @Suppress("DEPRECATION")
+                        windowManager.defaultDisplay.rotation
+                    }
+                    analyzer.targetRotation = displayRotation
+
+                    analyzer.setAnalyzer(cameraExecutor, FrameAnalyzer(
+                        onFrameProcessed = { finalBitmap ->
+                            // A Yolu Çıktısı: İşlenmiş yeşil ekran resmi
+                            runOnUiThread {
+                                findViewById<ImageView>(R.id.processedImageView)?.setImageBitmap(finalBitmap)
+                            }
+                        },
+                        onFaceUpdated = { faceData ->
+                            maskRenderer.updateFace(faceData)
                         }
-                    })
+                    ))
                 }
 
             // We've chosen the front camera

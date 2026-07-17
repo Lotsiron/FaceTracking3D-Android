@@ -10,8 +10,8 @@ import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
 import java.nio.ByteBuffer
 
 class FrameAnalyzer(
-    // Bu callback sayesinde işlenen resmi MainActivity'ye geri göndereceğiz
-    private val onFrameProcessed: (Bitmap) -> Unit
+    private val onFrameProcessed: (Bitmap) -> Unit,
+    private val onFaceUpdated: (FaceData) -> Unit
 ) : ImageAnalysis.Analyzer {
 
     private val segmenter = Segmentation.getClient(
@@ -25,6 +25,8 @@ class FrameAnalyzer(
     private var outputBitmap: Bitmap? = null
     private var imagePixels: IntArray? = null
     private var resultPixels: IntArray? = null
+    // 2. FaceTracker'ı FrameAnalyzer'ın içinde başlatıyoruz
+    private val faceTracker = FaceTracker(onFaceUpdated)
 
     @ExperimentalGetImage
     override fun analyze(imageProxy: ImageProxy) {
@@ -32,41 +34,54 @@ class FrameAnalyzer(
         if (mediaImage != null) {
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
+            // Önce A YOLU: Yeşil Ekran İşlemi
             segmenter.process(image)
                 .addOnSuccessListener { segmentationMask ->
                     val maskBuffer = segmentationMask.buffer
                     val maskWidth = segmentationMask.width
                     val maskHeight = segmentationMask.height
 
+                    // kameradan gelen ham veri karelere dönüştürülüyor
                     val originalBitmap = imageProxy.toBitmap()
 
                     if (originalBitmap != null) {
-                        // Boyut kontrolü ve bellek tahsisi
+                        // 1. Yan kamerayı dik (Portrait) hale getiriyoruz
+                        val matrix = android.graphics.Matrix()
+                        matrix.postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+
+                        // Döndürülmüş resmimiz:
+                        val rotatedBitmap = Bitmap.createBitmap(
+                            originalBitmap, 0, 0, originalBitmap.width, originalBitmap.height, matrix, true
+                        )
+
+                        // 2. Yırtılmayı Önleyen Hamle: Artık boyut değiştirme/ezme (Scale) YAPMIYORUZ!
+                        // rotatedBitmap ve maskWidth zaten birebir aynı boyutlarda.
                         if (outputBitmap == null || outputBitmap!!.width != maskWidth || outputBitmap!!.height != maskHeight) {
                             outputBitmap = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ARGB_8888)
                             imagePixels = IntArray(maskWidth * maskHeight)
                             resultPixels = IntArray(maskWidth * maskHeight)
                         }
 
-                        val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, maskWidth, maskHeight, true)
-                        scaledBitmap.getPixels(imagePixels!!, 0, maskWidth, 0, 0, maskWidth, maskHeight)
+                        // Doğrudan döndürülmüş resmin piksellerini alıyoruz
+                        rotatedBitmap.getPixels(imagePixels!!, 0, maskWidth, 0, 0, maskWidth, maskHeight)
 
-                        // Yeşil ekran Alpha Blending işlemi
+                        // Yeşil ekran maskesini uyguluyoruz
                         applyGreenScreenEffect(maskBuffer, maskWidth, maskHeight)
 
-                        val finalBitmap = Bitmap.createScaledBitmap(
-                            outputBitmap!!,
-                            originalBitmap.width,
-                            originalBitmap.height,
-                            true
-                        )
-
-                        // İşlem bitince arayüze pasla
-                        onFrameProcessed(finalBitmap)
+                        // Çıktıyı doğrudan arayüze paslıyoruz. (Scale işlemi tamamen kaldırıldı, saf netlik!)
+                        onFrameProcessed(outputBitmap!!)
                     }
                 }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("FrameAnalyzer", "Segmentasyon hatası", e)
+                }
                 .addOnCompleteListener {
-                    imageProxy.close()
+                    // YENİ: A Yolu BİTTİ. Kapıyı kapatmıyoruz!
+                    // Aynı görseli B Yolu'na (FaceTracker) paslıyoruz.
+                    faceTracker.processImage(image) {
+                        // B Yolu da bitince FaceTracker bu bloğu tetikler ve kareyi güvenle kapatırız.
+                        imageProxy.close()
+                    }
                 }
         } else {
             imageProxy.close()

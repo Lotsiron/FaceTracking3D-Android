@@ -51,4 +51,7 @@ dependencies {
     implementation(libs.mlkit.face.detection)
     implementation(libs.mlkit.face.mesh.detection)
     implementation(libs.mlkit.segmentation.selfie)
+
+    // 3D Render Motoru
+    implementation("io.github.sceneview:sceneview:2.2.1")
 }
