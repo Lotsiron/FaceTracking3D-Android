@@ -9,7 +9,8 @@ import io.github.sceneview.node.ModelNode
 import io.github.sceneview.node.Node
 import com.example.facetracking3d.vision.FaceData
 import kotlinx.coroutines.launch
-import android.graphics.Color // YENİ EKLENDİ
+import android.graphics.Color
+import com.google.android.filament.View
 
 class MaskRenderer(
     private val lifecycleScope: LifecycleCoroutineScope,
@@ -26,15 +27,17 @@ class MaskRenderer(
 
     private fun setupScene() {
 // 1. ANDROID KATMANI: SurfaceView'u saydam ve en üste ayarla
+        // 3D uzay boşluğunu tamamen şeffaf cam yap:
         sceneView.setZOrderOnTop(true)
         sceneView.holder.setFormat(android.graphics.PixelFormat.TRANSPARENT)
-        sceneView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-
-        // 2. FİLAMENT (C++) KATMANI: Motorun kendi siyah arkaplanını zorla yok et
-        // Filament Scene'e ulaşıp siyah gökyüzü kutusunu siliyoruz
+        sceneView.setBackgroundColor(Color.TRANSPARENT)
         sceneView.scene?.skybox = null
-        // Render motorunun harmanlama modunu (Blend Mode) yarı saydama (Translucent) geçiriyoruz
-        sceneView.view?.blendMode = com.google.android.filament.View.BlendMode.TRANSLUCENT
+        sceneView.view?.blendMode = View.BlendMode.TRANSLUCENT
+
+        sceneView.renderer?.clearOptions = com.google.android.filament.Renderer.ClearOptions().apply {
+            clear = true
+            clearColor = floatArrayOf(0f, 0f, 0f, 0f) // 100% Transparent Black
+        }
 
         // -- Kodun geri kalanı aynı şekilde devam edecek --
         sceneView.addChildNode(faceNode)
@@ -78,9 +81,12 @@ class MaskRenderer(
             z = faceData.headEulerAngleZ
         )
 
-        faceNode.scale = io.github.sceneview.math.Scale(0.05f, 0.05f, 0.05f)
+        // 2. SCALE CALIBRATION
+        // Adjust the scale based on the face size to keep the 3D model proportional
+        val baseScale = 0.05f
+        faceNode.scale = io.github.sceneview.math.Scale(baseScale)
 
-        // 2. POZİSYON MATEMATİĞİ (Genişliği de gönderiyoruz ki Z eksenini hesaplayalım)
+        // 3. POZİSYON MATEMATİĞİ (Genişliği de gönderiyoruz ki Z eksenini hesaplayalım)
         val worldPosition = convertPixelsToWorldSpace(
             faceX = faceData.x,
             faceY = faceData.y,
