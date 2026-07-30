@@ -1,34 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/mainRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- 1. KATMAN (EN ALT): Donanımsal Kamera -->
-    <!-- Kameranın ham görüntüsünü çeker ama biz bunu genellikle
-         arka planda gizli çalıştırırız. -->
-<!--    <androidx.camera.view.PreviewView-->
-<!--        android:id="@+id/viewFinder"-->
-<!--        android:layout_width="1dp"-->
-<!--        android:layout_height="1dp" />-->
-
-    <!-- 2. KATMAN (ORTA): Yeşil Ekran Tuvalimiz -->
-    <!-- İşte geri getirdiğimiz eleman. Kotlin'in (FrameAnalyzer)
-         kendi elleriyle çizdiği yeşil ekranlı Bitmap'i her saniye
-         bu tuvale fırlatırız. -->
-    <ImageView
-        android:id="@+id/processedImageView"
+    <!-- 1. BACKEND LAYER: OpenGL SurfaceView for the Green Screen Camera Feed -->
+    <android.opengl.GLSurfaceView
+        android:id="@+id/glSurfaceView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="centerCrop" />
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- 3. KATMAN (EN ÜST): 3D Hologram Motoru -->
-    <!-- Bu katmanın arka planı tamamen şeffaftır (Transparent).
-         Sadece içine koyduğumuz 3D şapkayı çizer. Şeffaf olduğu için
-         altındaki ImageView'daki (2. Katman) yeşil ekranlı videomuzu görürüz. -->
+    <!-- 2. FOREGROUND LAYER: SceneView Surface for the 3D Hat -->
     <io.github.sceneview.SceneView
         android:id="@+id/sceneView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="match_parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
-</FrameLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

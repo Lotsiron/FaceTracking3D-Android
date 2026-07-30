@@ -8,53 +8,60 @@ import android.graphics.Paint
 import android.graphics.PorterDuff
 
 object FrameStandardizer {
-    // Expose fixed targets so FaceTracker knows the new dimensions
-    const val TARGET_WIDTH = 480
-    const val TARGET_HEIGHT = 854
+    const val TARGET_WIDTH = 360
+    const val TARGET_HEIGHT = 640
 
-    // Update the internal targets
-    private const val TARGET_SHORT = 480
-    private const val TARGET_LONG = 854
+    private const val TARGET_SHORT = 360
+    private const val TARGET_LONG = 640
 
-    private var outputBitmap: Bitmap? = null
-    private var canvas: Canvas? = null
-    private val matrix = Matrix()
+    // DOUBLE BUFFERING: Two distinct Bitmaps to prevent CPU/GPU write collisions
+    private var outputBitmapA: Bitmap? = null
+    private var outputBitmapB: Bitmap? = null
+    private var canvasA: Canvas? = null
+    private var canvasB: Canvas? = null
+    private var useBitmapA = true
+
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
 
     fun standardize(rawBitmap: Bitmap, rotationDegrees: Int): Bitmap {
-        // 1. Calculate actual dimensions after rotation is applied
         val isRotated = rotationDegrees % 180 != 0
         val inWidth = if (isRotated) rawBitmap.height else rawBitmap.width
         val inHeight = if (isRotated) rawBitmap.width else rawBitmap.height
 
-        // 2. Detect Landscape vs Portrait
         val isLandscape = inWidth > inHeight
         val targetW = if (isLandscape) TARGET_LONG else TARGET_SHORT
         val targetH = if (isLandscape) TARGET_SHORT else TARGET_LONG
 
-        // 3. Reallocate ONLY if orientation changes
-        if (outputBitmap == null || outputBitmap!!.width != targetW || outputBitmap!!.height != targetH) {
-            outputBitmap = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
-            canvas = Canvas(outputBitmap!!)
+        // Allocate both buffers if uninitialized or resized
+        if (outputBitmapA == null || outputBitmapA!!.width != targetW || outputBitmapA!!.height != targetH) {
+            outputBitmapA = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
+            canvasA = Canvas(outputBitmapA!!)
+
+            outputBitmapB = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
+            canvasB = Canvas(outputBitmapB!!)
         }
 
-        // 4. Center Crop Math
+        // Ping-pong between the two buffers
+        val targetBitmap = if (useBitmapA) outputBitmapA!! else outputBitmapB!!
+        val targetCanvas = if (useBitmapA) canvasA!! else canvasB!!
+        useBitmapA = !useBitmapA
+
         val scaleX = targetW.toFloat() / inWidth
         val scaleY = targetH.toFloat() / inHeight
         val scale = maxOf(scaleX, scaleY)
 
-        matrix.reset()
+        val matrix = Matrix()
         matrix.postTranslate(-rawBitmap.width / 2f, -rawBitmap.height / 2f)
         matrix.postRotate(rotationDegrees.toFloat())
         matrix.postScale(scale, scale)
         matrix.postTranslate(targetW / 2f, targetH / 2f)
 
-        // 5. Draw
-        canvas!!.drawColor(Color.BLACK, PorterDuff.Mode.CLEAR)
-        canvas!!.drawBitmap(rawBitmap, matrix, paint)
+        // Clear ONLY the write-buffer for this frame
+        targetCanvas.drawColor(Color.BLACK, PorterDuff.Mode.CLEAR)
+        targetCanvas.drawBitmap(rawBitmap, matrix, paint)
 
         rawBitmap.recycle()
 
-        return outputBitmap!!
+        return targetBitmap
     }
 }
