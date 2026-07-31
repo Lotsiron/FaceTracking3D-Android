@@ -1,4 +1,4 @@
-package com.example.facetracking3d.vision
+package com.example.facetracking3d.vision.legacy
 
 import android.graphics.Bitmap
 import java.nio.ByteBuffer

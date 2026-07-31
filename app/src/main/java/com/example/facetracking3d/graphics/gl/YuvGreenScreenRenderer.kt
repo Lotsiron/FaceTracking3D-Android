@@ -4,7 +4,6 @@ import android.graphics.SurfaceTexture
 import android.opengl.GLES11Ext
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -12,7 +11,8 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 class YuvGreenScreenRenderer(
-    private val enableGreenScreen: Boolean,
+    var enableGreenScreen: Boolean, // Mutable for UI switch
+    var isMirrored: Boolean,        // Mutable for UI switch
     private val requestRender: () -> Unit,
     private val onSurfaceReady: (SurfaceTexture) -> Unit
 ) : GLSurfaceView.Renderer {
@@ -21,7 +21,7 @@ class YuvGreenScreenRenderer(
     class FrameBuffer(val fboId: Int, val textureId: Int) {
         var timestamp: Long = 0L
     }
-    private val RING_BUFFER_SIZE = 10 // Holds ~300ms of video history
+    private val RING_BUFFER_SIZE = 10
     private val fboArray = ArrayList<FrameBuffer>()
     private var fboHead = 0
     private var needsFboAllocation = false
@@ -51,14 +51,20 @@ class YuvGreenScreenRenderer(
     private var copyPosHandle = 0; private var copyTexHandle = 0; private var copyMatrixHandle = 0; private var copySamplerHandle = 0
 
     private var compProgram = 0
-    private var compPosHandle = 0; private var compTexHandle = 0; private var compCameraHandle = 0; private var compMaskHandle = 0; private var compEnableHandle = 0
+    private var compPosHandle = 0; private var compTexHandle = 0; private var compCameraHandle = 0; private var compMaskHandle = 0
+
+    // UI Variables and Handles
+    private var compEnableHandle = 0
+    private var compMirrorHandle = 0
+    private var compFeatherHandle = 0
+
+    private var edgeMin = 0.3f
+    private var edgeMax = 0.7f
 
     private val baseVertexData = floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
     private val textureData = floatArrayOf(0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f)
 
-    // baseVertexBuffer maps 1:1 for saving to the hidden FBOs
     private val baseVertexBuffer = ByteBuffer.allocateDirect(32).order(ByteOrder.nativeOrder()).asFloatBuffer().put(baseVertexData).apply { position(0) }
-    // croppedVertexBuffer applies the aspect ratio fix ONLY when drawing to the final screen
     private val croppedVertexBuffer = ByteBuffer.allocateDirect(32).order(ByteOrder.nativeOrder()).asFloatBuffer().put(baseVertexData).apply { position(0) }
     private val textureBuffer = ByteBuffer.allocateDirect(32).order(ByteOrder.nativeOrder()).asFloatBuffer().put(textureData).apply { position(0) }
 
@@ -69,6 +75,13 @@ class YuvGreenScreenRenderer(
             needsFboAllocation = true
             isCropDirty = true
         }
+    }
+
+    // Called by the UI Slider in MainActivity
+    fun setSensitivity(min: Float, max: Float) {
+        edgeMin = min
+        edgeMax = max
+        requestRender()
     }
 
     private fun allocateFBOs() {
@@ -123,7 +136,11 @@ class YuvGreenScreenRenderer(
         compTexHandle = GLES30.glGetAttribLocation(compProgram, "aTextureCoord")
         compCameraHandle = GLES30.glGetUniformLocation(compProgram, "uCameraTexture")
         compMaskHandle = GLES30.glGetUniformLocation(compProgram, "uMaskTexture")
+
+        // GRAB THE UI HANDLES HERE
         compEnableHandle = GLES30.glGetUniformLocation(compProgram, "uEnableGreenScreen")
+        compMirrorHandle = GLES30.glGetUniformLocation(compProgram, "uMirror")
+        compFeatherHandle = GLES30.glGetUniformLocation(compProgram, "uFeatherThresholds")
 
         val textures = IntArray(2)
         GLES30.glGenTextures(2, textures, 0)
@@ -142,7 +159,6 @@ class YuvGreenScreenRenderer(
 
         surfaceTexture = SurfaceTexture(cameraTextureId)
         surfaceTexture?.setOnFrameAvailableListener {
-            // ALWAYS request render so the Ring Buffer can quietly save the newest frames
             synchronized(maskLock) { hasNewHardwareFrame = true }
             requestRender()
         }
@@ -211,12 +227,11 @@ class YuvGreenScreenRenderer(
         }
 
         // --- STEP 3: FIND THE PERFECTLY SYNCED FRAME ---
-        if (fboArray.isEmpty()) return // Don't draw if buffer isn't ready
+        if (fboArray.isEmpty()) return
 
         var matchedTexId = -1
-        var bestIdx = (fboHead - 1 + RING_BUFFER_SIZE) % RING_BUFFER_SIZE // Default to absolute newest frame
+        var bestIdx = (fboHead - 1 + RING_BUFFER_SIZE) % RING_BUFFER_SIZE
 
-        // If Green Screen is on, travel back in time to match the AI timestamp!
         if (enableGreenScreen && pendingMaskTimestamp != 0L) {
             var minDiff = Long.MAX_VALUE
             for (i in fboArray.indices) {
@@ -237,9 +252,12 @@ class YuvGreenScreenRenderer(
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
 
         GLES30.glUseProgram(compProgram)
-        GLES30.glUniform1i(compEnableHandle, if (enableGreenScreen) 1 else 0)
 
-        // Draw using the Cropped Vertex Buffer so it looks proportional on screen
+        // PUSH THE UI VARIABLES TO THE GPU
+        GLES30.glUniform1i(compEnableHandle, if (enableGreenScreen) 1 else 0)
+        GLES30.glUniform1i(compMirrorHandle, if (isMirrored) 1 else 0)
+        GLES30.glUniform2f(compFeatherHandle, edgeMin, edgeMax)
+
         GLES30.glEnableVertexAttribArray(compPosHandle)
         GLES30.glVertexAttribPointer(compPosHandle, 2, GLES30.GL_FLOAT, false, 0, croppedVertexBuffer)
         GLES30.glEnableVertexAttribArray(compTexHandle)

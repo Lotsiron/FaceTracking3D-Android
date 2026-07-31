@@ -4,26 +4,97 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/mainRoot"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#000000">
 
-    <!-- 1. BACKEND LAYER: OpenGL SurfaceView for the Green Screen Camera Feed -->
+    <!-- 1. The GPU Video Layer -->
     <android.opengl.GLSurfaceView
         android:id="@+id/glSurfaceView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_height="match_parent" />
 
-    <!-- 2. FOREGROUND LAYER: SceneView Surface for the 3D Hat -->
+    <!-- 2. The 3D AR Layer -->
     <io.github.sceneview.SceneView
         android:id="@+id/sceneView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:background="@android:color/transparent" />
+
+    <!-- NEW: 3. The Settings Gear Icon -->
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_margin="16dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_menu_preferences"
+        app:tint="#FFFFFF"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        android:contentDescription="Settings" />
+
+    <!-- 4. The Control Panel Overlay (Now with an ID and hidden by default) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/controlPanelCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="#CC000000"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchGreenScreen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Enable Green Screen"
+                android:textColor="#FFFFFF"
+                android:checked="true" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchMirror"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Mirror Camera"
+                android:textColor="#FFFFFF"
+                android:checked="true" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchFaceTracking"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="3D Face Tracking"
+                android:textColor="#FFFFFF"
+                android:checked="false" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Mask Feathering (Sensitivity)"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <com.google.android.material.slider.RangeSlider
+                android:id="@+id/sliderSensitivity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:stepSize="0.05"
+                android:valueFrom="0.0"
+                android:valueTo="1.0"
+                app:values="@array/initial_slider_values" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

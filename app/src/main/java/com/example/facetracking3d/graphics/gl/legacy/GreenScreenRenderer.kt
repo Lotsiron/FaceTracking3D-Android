@@ -1,4 +1,4 @@
-package com.example.facetracking3d.graphics.gl
+package com.example.facetracking3d.graphics.gl.legacy
 
 import android.graphics.Bitmap
 import android.opengl.GLES30

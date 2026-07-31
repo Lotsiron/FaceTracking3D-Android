@@ -1,9 +1,11 @@
-package com.example.facetracking3d.vision
+package com.example.facetracking3d.vision.legacy
 
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.example.facetracking3d.graphics.gl.GreenScreenRenderer
+import com.example.facetracking3d.graphics.gl.legacy.GreenScreenRenderer
+import com.example.facetracking3d.vision.FaceData
+import com.example.facetracking3d.vision.FaceTracker
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.Segmentation
 import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions

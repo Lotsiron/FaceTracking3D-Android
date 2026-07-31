@@ -14,7 +14,7 @@ import com.google.android.filament.View
 
 class MaskRenderer(
     private val lifecycleScope: LifecycleCoroutineScope,
-    private val sceneView: SceneView
+    val sceneView: SceneView
 ) {
     private val faceNode = Node(sceneView.engine)
 

@@ -1,7 +1,6 @@
-package com.example.facetracking3d.graphics.gl
+package com.example.facetracking3d.graphics.gl.legacy
 
 import android.opengl.GLES30
-import android.util.Log
 
 object ShaderUtil {
     private const val TAG = "ShaderUtil"
